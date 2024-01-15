@@ -9,15 +9,15 @@ import requests
 
 
 class TelegramStream:
-    def __init__(self, token, chat_id):
+    def __init__(self, token: str, chat_id: str) -> None:
         self.token = token
         self.chat_id = chat_id
         self.message = []
 
-    def write(self, msg: str):
+    def write(self, msg: str) -> None:
         self.message.append(msg)
 
-    def flush(self):
+    def flush(self) -> None:
         try:
             response = requests.post(
                 url='https://api.telegram.org/bot{0}/sendMessage'.format(self.token),
@@ -49,7 +49,7 @@ logging.basicConfig(
 )
 
 
-def get_hours(profile_id: str):
+def get_hours(profile_id: str) -> float:
     response = requests.get(f'https://steamcommunity.com/profiles/{profile_id}')
     assert response.status_code == 200
 
@@ -59,14 +59,14 @@ def get_hours(profile_id: str):
     return hours
 
 
-def main():
+def main() -> None:
     with open('profiles.json') as file:
         profiles = load(file)
 
     for name in profiles:
         try:
             hours = get_hours(profiles[name])
-            logging.info(f'{name=}; {hours=}')
+            logging.info(f'{name=} {hours=}')
         except Exception as ex:
             logging.error(f'{name=}; {ex}')
         time.sleep(1)
