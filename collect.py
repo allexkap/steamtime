@@ -19,14 +19,15 @@ class TelegramStream:
 
     def flush(self) -> None:
         try:
+            text = ''.join(self.message)
+            self.message.clear()
             response = requests.post(
                 url='https://api.telegram.org/bot{0}/sendMessage'.format(self.token),
-                data={'chat_id': self.chat_id, 'text': ''.join(self.message)},
+                data={'chat_id': self.chat_id, 'text': text},
             )
-            assert response.status_code
-            self.message = []
-        except:
-            pass
+            assert response.status_code == 200, 'telegram response status code != 200'
+        except Exception as ex:
+            self.message.append(f'Previous log entry ERROR: {ex}\n\n')
 
 
 telegram_handler = logging.StreamHandler(
@@ -51,7 +52,7 @@ logging.basicConfig(
 
 def get_hours(profile_id: str) -> float:
     response = requests.get(f'https://steamcommunity.com/profiles/{profile_id}')
-    assert response.status_code == 200
+    assert response.status_code == 200, 'steam response status code != 200'
 
     res = re.search(r'([\d.]+) hours past 2 weeks', response.content.decode())
     hours = float(res[1]) if res else 0
