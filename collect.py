@@ -12,22 +12,22 @@ class TelegramStream:
     def __init__(self, token: str, chat_id: str) -> None:
         self.token = token
         self.chat_id = chat_id
-        self.message = []
+        self.messages = []
 
     def write(self, msg: str) -> None:
-        self.message.append(msg)
+        self.messages.append(msg)
 
     def flush(self) -> None:
         try:
-            text = ''.join(self.message)
-            self.message.clear()
+            text = ''.join(self.messages)
+            self.messages.clear()
             response = requests.post(
                 url='https://api.telegram.org/bot{0}/sendMessage'.format(self.token),
                 data={'chat_id': self.chat_id, 'text': text},
             )
             assert response.status_code == 200, 'telegram response status code != 200'
         except Exception as ex:
-            self.message.append(f'Previous log entry ERROR: {ex}\n\n')
+            self.messages.append(f'Previous log entry ERROR: {ex}\n\n')
 
 
 telegram_handler = logging.StreamHandler(
@@ -64,13 +64,20 @@ def main() -> None:
     with open('profiles.json') as file:
         profiles = load(file)
 
-    for name in profiles:
-        try:
-            hours = get_hours(profiles[name])
-            logging.info(f'{name=} {hours=}')
-        except Exception as ex:
-            logging.error(f'{name=}; {ex}')
-        time.sleep(1)
+    total_hours, hits = 0, 0
+    for _ in range(3):
+        for name in profiles:
+            try:
+                hours = get_hours(profiles[name])
+                logging.info(f'{name=} {hours=}')
+                total_hours += hours
+                hits += 1
+            except Exception as ex:
+                logging.error(f'{name=}; {ex}')
+            time.sleep(1)
+        if hits == len(profiles) and total_hours != 0:
+            break
+        time.sleep(60)
 
 
 if __name__ == '__main__':
