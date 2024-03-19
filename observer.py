@@ -1,7 +1,8 @@
 import json
+import re
 import sqlite3
 from argparse import ArgumentParser
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from time import sleep
 
@@ -19,6 +20,9 @@ class Activity:
     '''
     _insert_row_cmd = 'insert into activity values (?, ?, ?)'
     _select_tail_cmd = 'select * from activity order by timestamp desc limit ?'
+    _select_last_by_user_cmd = (
+        'select * from activity where account = ? order by timestamp desc limit 1'
+    )
 
     def __init__(self, path: Path):
         self.con = sqlite3.connect(path)
@@ -27,9 +31,13 @@ class Activity:
         self.con.commit()
 
     def insert(self, user: str, value: float):
-        ts = int(datetime.utcnow().timestamp())
+        ts = int(datetime.now().timestamp())
         self.cur.execute(self._insert_row_cmd, (ts, user, value))
         self.con.commit()
+
+    def get_last(self, user: str):
+        res = self.cur.execute(self._select_last_by_user_cmd, (user,))
+        return res.fetchone()
 
     def tail(self, n: int = 5):
         res = self.cur.execute(self._select_tail_cmd, (n,))
@@ -37,6 +45,17 @@ class Activity:
 
     def __del__(self):
         self.con.close()
+
+
+def assert_activity(activity: Activity, username: str, hours: float):
+    if hours:
+        return
+    entry = activity.get_last(username)
+    if entry is None:
+        return
+    ts = datetime.fromtimestamp(entry[0])
+    delta = (datetime.now() - ts).seconds / 3600
+    assert entry[2] <= delta, f'hours=0, last record with {entry[2]}h at {ts}'
 
 
 def every(step: timedelta, start: datetime | None = None):
@@ -50,7 +69,7 @@ def every(step: timedelta, start: datetime | None = None):
 
 
 def get_hours(profile_id: str) -> float:
-    response = requests.get(f'https://steamcomm_unity.com/profiles/{profile_id}')
+    response = requests.get(f'https://steamcommunity.com/profiles/{profile_id}')
     assert response.status_code == 200, f'steam {response.status_code=} != 200'
     res = re.search(r'([\d.]+) hours past 2 weeks', response.content.decode())
     hours = float(res[1]) if res else 0
@@ -97,16 +116,17 @@ if __name__ == '__main__':
     for _ in every(step=args.period, start=start):
         pending_profiles = set(profiles)
         for attempt in range(3):
-            for profile in pending_profiles.copy():
+            for username in pending_profiles.copy():
                 try:
-                    hours = get_hours(profile)
-                    activity.insert(profile, hours)
-                    pending_profiles.remove(profile)
+                    hours = get_hours(profiles[username])
+                    assert_activity(activity, username, hours)
+                    activity.insert(username, hours)
+                    pending_profiles.remove(username)
                 except Exception as ex:
-                    pass
+                    print(f'{datetime.now().ctime()}; {username}; {repr(ex)}')
                 sleep(2)
             if not pending_profiles:
                 break
             sleep(60)
-        for profile in pending_profiles:
-            activity.insert(profile, None)
+        for username in pending_profiles:
+            activity.insert(username, None)
