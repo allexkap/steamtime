@@ -1,8 +1,11 @@
+import json
 import sqlite3
 from argparse import ArgumentParser
 from datetime import datetime, timedelta
 from pathlib import Path
 from time import sleep
+
+import requests
 
 
 class Activity:
@@ -46,6 +49,14 @@ def every(step: timedelta, start: datetime | None = None):
         sleep(1)
 
 
+def get_hours(profile_id: str) -> float:
+    response = requests.get(f'https://steamcomm_unity.com/profiles/{profile_id}')
+    assert response.status_code == 200, f'steam {response.status_code=} != 200'
+    res = re.search(r'([\d.]+) hours past 2 weeks', response.content.decode())
+    hours = float(res[1]) if res else 0
+    return hours
+
+
 def parse_args():
     parser = ArgumentParser()
     parser.add_argument(
@@ -65,7 +76,7 @@ def parse_args():
     parser.add_argument(
         '-u',
         '--profiles_path',
-        help='path to sqlite3 database',
+        help='path to json file with list of profiles',
         default='./profiles.json',
         type=Path,
     )
@@ -77,7 +88,25 @@ def parse_args():
 if __name__ == '__main__':
     args = parse_args()
 
+    activity = Activity(args.db_path)
+    with open(args.profiles_path) as file:
+        profiles = json.load(file)
+
     start = datetime.now().replace(minute=0, second=0, microsecond=0)
     start += ((datetime.now() - start) // args.period + 1) * args.period
     for _ in every(step=args.period, start=start):
-        pass
+        pending_profiles = set(profiles)
+        for attempt in range(3):
+            for profile in pending_profiles.copy():
+                try:
+                    hours = get_hours(profile)
+                    activity.insert(profile, hours)
+                    pending_profiles.remove(profile)
+                except Exception as ex:
+                    pass
+                sleep(2)
+            if not pending_profiles:
+                break
+            sleep(60)
+        for profile in pending_profiles:
+            activity.insert(profile, None)
