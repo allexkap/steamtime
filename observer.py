@@ -3,29 +3,31 @@ from pathlib import Path
 from datetime import datetime
 
 
-db_path = Path('db.sqlite3')
+class Activity:
 
+    _create_table_cmd = '''
+        create table if not exists activity (
+            timestamp integer not null,
+            account text not null,
+            hours real
+        ) strict
+    '''
+    _insert_row_cmd = 'insert into activity values (?, ?, ?)'
+    _select_tail_cmd = 'select * from activity order by timestamp desc limit ?'
 
-db_create_table = '''
-create table if not exists activity (
-    timestamp integer,
-    account text,
-    hours real
-) strict
-'''
-db_insert_row = 'insert into activity values (?, ?, ?)'
+    def __init__(self, path: Path):
+        self.con = sqlite3.connect(path)
+        self.cur = self.con.cursor()
+        self.cur.execute(self._create_table_cmd)
 
-con = sqlite3.connect(db_path)
-cur = con.cursor()
+    def insert(self, user: str, value: float):
+        ts = int(datetime.utcnow().timestamp())
+        self.cur.execute(self._insert_row_cmd, (ts, user, value))
+        self.con.commit()
 
-cur.execute(db_create_table)
-con.commit()
+    def tail(self, n: int = 5):
+        res = self.cur.execute(self._select_tail_cmd, (n,))
+        return res.fetchall()
 
-
-def add_entry(user, value):
-    ts = int(datetime.utcnow().timestamp())
-    cur.execute(db_insert_row, (ts, user, value))
-    con.commit()
-
-
-con.close()
+    def __del__(self):
+        self.con.close()
