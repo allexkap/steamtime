@@ -1,8 +1,9 @@
 import json
 import re
 import sqlite3
+import sys
 from argparse import ArgumentParser
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 from time import sleep
 
@@ -68,6 +69,10 @@ def every(step: timedelta, start: datetime | None = None):
         sleep(1)
 
 
+def printerr(*args, **kwargs):
+    return print(*args, **kwargs, file=sys.stderr)
+
+
 def get_hours(profile_id: str) -> float:
     response = requests.get(f'https://steamcommunity.com/profiles/{profile_id}')
     assert response.status_code == 200, f'steam {response.status_code=} != 200'
@@ -116,14 +121,14 @@ if __name__ == '__main__':
     for _ in every(step=args.period, start=start):
         pending_profiles = set(profiles)
         for attempt in range(3):
-            for username in pending_profiles.copy():
+            for username in sorted(pending_profiles):
                 try:
                     hours = get_hours(profiles[username])
                     assert_activity(activity, username, hours)
                     activity.insert(username, hours)
                     pending_profiles.remove(username)
                 except Exception as ex:
-                    print(f'{datetime.now().ctime()}; {username}; {repr(ex)}')
+                    printerr(f'{datetime.now().ctime()}; {username}; {repr(ex)}')
                 sleep(2)
             if not pending_profiles:
                 break

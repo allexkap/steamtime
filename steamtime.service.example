@@ -1,0 +1,14 @@
+[Unit]
+StartLimitIntervalSec=1800
+StartLimitBurst=5
+
+[Service]
+Type=idle
+User=rpzw
+WorkingDirectory=/home/rpzw/steamtime/
+ExecStart=python observer.py
+Restart=always
+RestartSec=300
+
+[Install]
+WantedBy=multi-user.target
