@@ -21,9 +21,11 @@ class Activity:
     '''
     _insert_row_cmd = 'insert into activity values (?, ?, ?)'
     _select_tail_cmd = 'select * from activity order by timestamp desc limit ?'
-    _select_last_by_user_cmd = (
-        'select * from activity where account = ? order by timestamp desc limit 1'
-    )
+    _select_last_by_user_cmd = '''
+        select * from activity
+        where account = ? and hours != 0
+        order by timestamp desc limit 1
+    '''
 
     def __init__(self, path: Path):
         self.con = sqlite3.connect(path)
@@ -56,7 +58,7 @@ def assert_activity(activity: Activity, username: str, hours: float):
         return
     ts = datetime.fromtimestamp(entry[0])
     delta = (datetime.now() - ts).seconds / 3600
-    assert entry[2] <= delta, f'hours=0, last record with {entry[2]}h at {ts}'
+    assert entry[2] <= delta, f'hours=0, record with {entry[2]}h at {ts}'
 
 
 def every(step: timedelta, start: datetime | None = None):
