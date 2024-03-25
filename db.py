@@ -1,6 +1,5 @@
 import sqlite3
 from datetime import datetime
-from pathlib import Path
 
 
 class Activity:
@@ -10,23 +9,23 @@ class Activity:
             timestamp integer not null,
             account text not null,
             hours real
-        ) strict
+        )
     '''
     _insert_row_cmd = 'insert into activity values (?, ?, ?)'
     _select_tail_cmd = 'select * from activity order by timestamp desc limit ?'
     _select_last_by_user_cmd = '''
         select * from activity
-        where account = ? and hours != 0
+        where account = ? and hours is not null
         order by timestamp desc limit 1
     '''
 
-    def __init__(self, path: Path):
+    def __init__(self, path: str):
         self.con = sqlite3.connect(path)
         self.cur = self.con.cursor()
         self.cur.execute(self._create_table_cmd)
         self.con.commit()
 
-    def insert(self, user: str, value: float):
+    def insert(self, user: str, value: float | None):
         ts = int(datetime.now().timestamp())
         self.cur.execute(self._insert_row_cmd, (ts, user, value))
         self.con.commit()
